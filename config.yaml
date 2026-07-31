@@ -1,0 +1,65 @@
+# ============================================================================
+# Elise — configuração central.
+# Todos os backends são trocáveis aqui, sem alterar código (config-driven).
+# ============================================================================
+
+audio:
+  input_device: 1        # null = dispositivo padrão do Windows. Use `elise --list-devices`. 1 - 18 - 23
+  sample_rate: 16000        # Taxa nativa do Silero VAD / Whisper. Não altere.
+  frame_samples: 512        # 32 ms @ 16 kHz — tamanho de frame exigido pelo Silero VAD v5.
+
+vad:
+  threshold: 0.55           # Probabilidade mínima de fala (0-1). Suba se houver falsos positivos.
+  min_speech_ms: 200        # Fala mais curta que isso é ignorada (ruídos impulsivos).
+  min_silence_ms: 700       # Silêncio para considerar o enunciado encerrado (fim de turno).
+  pre_roll_ms: 320          # Áudio anterior ao gatilho incluído no enunciado (não corta o início).
+  max_utterance_s: 30       # Guarda contra enunciados infinitos.
+
+denoise:
+  # deepfilternet -> DeepFilterNet3 (melhor qualidade; extra [denoise])
+  # noisereduce   -> spectral gating leve (extra [noisereduce])
+  # none          -> passthrough
+  # Fallback automático em cascata se o backend escolhido não estiver instalado.
+  backend: deepfilternet
+
+stt:
+  backend: faster_whisper
+  model: small              # small|medium — ponto ideal p/ pt-BR na RX 580 (ver estudo técnico).
+  language: pt
+  device: cpu               # CTranslate2 não usa Vulkan/DirectML; CPU int8 é o caminho na AMD.
+  compute_type: int8
+  beam_size: 5
+
+llm:
+  backend: openai_compat    # LM Studio, Ollama, llama.cpp llama-server, OpenAI... tudo drop-in.
+  base_url: http://localhost:1234/v1   # Servidor local do LM Studio.
+  api_key: lm-studio        # LM Studio ignora a chave, mas o campo é obrigatório no protocolo.
+  model: qwen/qwen3.5-9b         # Identificador do modelo carregado no LM Studio.
+  temperature: 0.7
+  max_tokens: 512
+  request_timeout_s: 120
+  history_max_turns: 12     # Janela de memória de curto prazo (pares user/assistant).
+  reasoning_effort: none    # Qwen3.x pensa por padrão e gasta max_tokens inteiro em
+                            # "reasoning_content" antes da resposta real (fica vazia).
+                            # "none" desliga o thinking. null para deixar o padrão do modelo.
+  system_prompt: |
+    Você é uma assistente.
+    Responda de forma concisa e natural.
+
+tts:
+  backend: piper            # piper (local, recomendado) | edge (nuvem, requer ffmpeg)
+  piper:
+    # Baixe em https://huggingface.co/rhasspy/piper-voices (pt/pt_BR/faber/medium)
+    model_path: models/piper/pt_BR-faber-medium.onnx
+  edge:
+    voice: pt-BR-FranciscaNeural
+
+behavior:
+  # half_duplex: microfone silenciado enquanto a Elise fala (padrão seguro sem AEC).
+  # full_duplex: barge-in experimental — falar por cima interrompe a Elise.
+  #              SEM AEC (Fase 2) a Elise pode se auto-interromper com a própria voz
+  #              se o microfone captar os alto-falantes; ideal com fone de ouvido.
+  mode: half_duplex
+
+logging:
+  level: INFO

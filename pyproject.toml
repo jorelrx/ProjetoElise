@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "elise"
+version = "0.1.0"
+description = "Elise — assistente de voz local-first (captura contínua → denoise → VAD → STT → LLM → TTS) para Windows 11"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26",
+    "sounddevice>=0.4.6",
+    "onnxruntime>=1.17",
+    "faster-whisper>=1.0",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "structlog>=24.1",
+    "piper-tts>=1.2",
+]
+
+[project.optional-dependencies]
+# Redução de ruído de alta qualidade (DeepFilterNet3) — requer torch.
+denoise = ["deepfilternet>=0.5.6", "torch>=2.2"]
+# Fallback leve de denoise por spectral gating.
+noisereduce = ["noisereduce>=3.0"]
+# TTS de nuvem gratuito (vozes Neural pt-BR da Microsoft). Requer ffmpeg no PATH.
+edge = ["edge-tts>=6.1"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.10"]
+
+[project.scripts]
+elise = "elise.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/elise"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
