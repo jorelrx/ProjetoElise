@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from elise.config import DuplexMode, EliseConfig, load_config
+from elise.config import DuplexMode, EliseConfig, PromptConfig, WakeWordConfig, load_config
 from elise.events import EventBus
 
 
@@ -29,6 +29,42 @@ def test_config_yaml_sobrescreve(tmp_path: Path):
 def test_sample_rate_invalido_falha_cedo():
     with pytest.raises(ValidationError):
         EliseConfig.model_validate({"audio": {"sample_rate": 44100}})
+
+
+def test_wakeword_config_defaults():
+    cfg = WakeWordConfig()
+    assert cfg.enabled is False
+    assert cfg.backend == "openwakeword"
+    assert cfg.model == "hey_jarvis"
+    assert cfg.fallback_model == "hey_jarvis"
+    assert cfg.threshold == 0.5
+    assert cfg.inactivity_timeout_s == 45.0
+    assert cfg.cooldown_s == 2.0
+
+
+def test_wakeword_threshold_fora_do_intervalo_falha():
+    with pytest.raises(ValidationError):
+        WakeWordConfig(threshold=1.5)
+
+
+def test_prompt_config_defaults():
+    cfg = PromptConfig()
+    assert cfg.persona == "elise"
+    assert cfg.include_datetime is True
+
+
+def test_wakeword_e_prompt_sobrescritos_via_yaml(tmp_path: Path):
+    p = tmp_path / "config.yaml"
+    p.write_text(
+        "wakeword:\n  enabled: true\n  model: hey_elise\n  threshold: 0.7\n"
+        "llm:\n  prompt:\n    persona: elise\n    include_datetime: false\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(p)
+    assert cfg.wakeword.enabled is True
+    assert cfg.wakeword.model == "hey_elise"
+    assert cfg.wakeword.threshold == 0.7
+    assert cfg.llm.prompt.include_datetime is False
 
 
 def test_bus_drop_oldest_sob_pressao():

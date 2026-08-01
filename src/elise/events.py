@@ -38,6 +38,15 @@ class SpeechStarted:
 
 
 @dataclass(slots=True)
+class WakeWordDetected:
+    """Wake word ("Hey Elise") detectada enquanto o orquestrador estava em IDLE."""
+
+    timestamp: float
+    score: float
+    model: str
+
+
+@dataclass(slots=True)
 class UtteranceCaptured:
     """Enunciado completo do usuário (fala + pre-roll), pronto para STT."""
 
@@ -53,7 +62,7 @@ class TranscriptReady:
 
 @dataclass(slots=True)
 class AssistantStateChanged:
-    state: str  # "listening" | "thinking" | "speaking"
+    state: str  # "idle" | "listening" | "thinking" | "speaking"
 
 
 @dataclass(slots=True)

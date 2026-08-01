@@ -13,6 +13,13 @@ Responsabilidades:
 - Full-duplex (experimental): barge-in — SpeechStarted durante SPEAKING
   cancela LLM+TTS+playback instantaneamente.
 - Memória honesta: só entra no histórico o que foi efetivamente falado.
+- Wake word opcional: com ``wake_enabled``, adiciona um estado IDLE
+  (dormindo) antes de LISTENING — só acorda com ``WakeWordDetected`` e
+  volta a dormir após inatividade. Limitação conhecida: como o gate do
+  microfone só abre no instante da detecção (sem pre-roll compartilhado
+  entre o WakeWordDetector e o UtteranceSegmenter), um comando dito no
+  mesmo fôlego do gatilho ("Hey Elise, que horas são?") pode perder as
+  primeiras sílabas.
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ import structlog
 from .audio.denoise import Denoiser
 from .audio.playback import AudioPlayer
 from .config import DuplexMode, EliseConfig
-from .events import EventBus, SpeechStarted, UtteranceCaptured
+from .events import EventBus, SpeechStarted, UtteranceCaptured, WakeWordDetected
 from .llm import OpenAICompatChat
 from .llm.sentence_stream import sentences
 from .stt import SpeechToText
@@ -39,6 +46,7 @@ log = structlog.get_logger(__name__)
 
 
 class State(str, Enum):
+    IDLE = "idle"
     LISTENING = "listening"
     THINKING = "thinking"
     SPEAKING = "speaking"
@@ -54,6 +62,7 @@ class Orchestrator:
         llm: OpenAICompatChat,
         tts: TextToSpeech,
         player: AudioPlayer,
+        wake_enabled: bool = False,
     ) -> None:
         self._cfg = cfg
         self._bus = bus
@@ -62,30 +71,68 @@ class Orchestrator:
         self._llm = llm
         self._tts = tts
         self._player = player
+        self._wake_enabled = wake_enabled
 
-        self.state = State.LISTENING
+        self.state = State.IDLE if wake_enabled else State.LISTENING
         self._turn_task: asyncio.Task | None = None
         self._utterances = bus.subscribe(UtteranceCaptured, maxsize=4)
         self._speech_started = bus.subscribe(SpeechStarted, maxsize=8)
+        self._wake_events = bus.subscribe(WakeWordDetected, maxsize=4)
 
     # ------------------------------------------------------------------ #
-    # Gate do microfone (consultado pelo UtteranceSegmenter)
+    # Gate do microfone (consultado pelo UtteranceSegmenter e pelo WakeWordDetector)
     # ------------------------------------------------------------------ #
 
     def mic_gate_open(self) -> bool:
+        if self.state is State.IDLE:
+            return False  # dormindo: nem full-duplex escuta
         if self._cfg.behavior.mode is DuplexMode.FULL:
             return True  # sempre ouvindo (barge-in)
         return self.state is State.LISTENING
 
+    def wake_armed(self) -> bool:
+        """Consultado pelo WakeWordDetector: só roda o gatilho enquanto dormindo."""
+        return self._wake_enabled and self.state is State.IDLE
+
     # ------------------------------------------------------------------ #
 
     async def run(self) -> None:
+        """Loop principal.
+
+        Com wake word habilitado, alterna entre dormir (IDLE, aguardando
+        ``WakeWordDetected``) e ouvir enunciados com um timeout de
+        inatividade que devolve ao repouso. Enquanto há um turno em
+        andamento, a espera por enunciados não tem timeout — a contagem de
+        inatividade só recomeça (do zero) depois que o turno termina, para
+        nunca cortar uma fala longa da Elise no meio.
+        """
         barge_task = None
         if self._cfg.behavior.mode is DuplexMode.FULL:
             barge_task = asyncio.create_task(self._barge_in_watch(), name="barge-in")
         try:
             while True:
-                utt = await self._utterances.get()
+                if self.state is State.IDLE:
+                    await self._wake_events.get()
+                    self._set_state(State.LISTENING)
+                    log.info("wakeword.acordou")
+                    continue
+
+                turno_ativo = self._turn_task is not None and not self._turn_task.done()
+                if self._wake_enabled and not turno_ativo:
+                    try:
+                        utt = await asyncio.wait_for(
+                            self._utterances.get(),
+                            timeout=self._cfg.wakeword.inactivity_timeout_s,
+                        )
+                    except asyncio.TimeoutError:
+                        self._set_state(State.IDLE)
+                        continue
+                else:
+                    # Sem wake word, ou turno em andamento: nunca conta
+                    # inatividade contra um turno que já está rolando — o
+                    # timeout só se aplica a intervalos realmente ociosos.
+                    utt = await self._utterances.get()
+
                 if self._turn_task and not self._turn_task.done():
                     # Novo enunciado durante um turno: interrompe o anterior.
                     await self._cancel_turn()

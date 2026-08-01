@@ -39,6 +39,16 @@ class VadConfig(BaseModel):
     max_utterance_s: int = Field(30, ge=1)
 
 
+class WakeWordConfig(BaseModel):
+    enabled: bool = False
+    backend: str = "openwakeword"
+    model: str = "hey_jarvis"        # nome pré-treinado OU caminho p/ .onnx custom
+    fallback_model: str = "hey_jarvis"  # usado se `model` for um .onnx que ainda não existe
+    threshold: float = Field(0.5, ge=0.0, le=1.0)
+    inactivity_timeout_s: float = Field(45.0, gt=0)
+    cooldown_s: float = Field(2.0, ge=0)
+
+
 class DenoiseBackend(str, Enum):
     DEEPFILTERNET = "deepfilternet"
     NOISEREDUCE = "noisereduce"
@@ -58,6 +68,11 @@ class SttConfig(BaseModel):
     beam_size: int = Field(5, ge=1)
 
 
+class PromptConfig(BaseModel):
+    persona: str = "elise"          # nome de persona embutida OU caminho p/ arquivo .md
+    include_datetime: bool = True   # injeta data/hora local no prompt
+
+
 class LlmConfig(BaseModel):
     backend: str = "openai_compat"
     base_url: str = "http://localhost:1234/v1"
@@ -67,12 +82,12 @@ class LlmConfig(BaseModel):
     max_tokens: int = Field(512, ge=1)
     request_timeout_s: float = Field(120.0, gt=0)
     history_max_turns: int = Field(12, ge=1)
-    system_prompt: str = "Você é a Elise, uma assistente de voz brasileira."
+    prompt: PromptConfig = PromptConfig()
     reasoning_effort: str | None = "none"
 
 
 class PiperConfig(BaseModel):
-    model_path: Path = Path("models/piper/pt_BR-faber-medium.onnx")
+    model_path: Path = Path("models/piper/pt_BR-miro-high.onnx")
 
 
 class EdgeConfig(BaseModel):
@@ -101,6 +116,7 @@ class LoggingConfig(BaseModel):
 class EliseConfig(BaseModel):
     audio: AudioConfig = AudioConfig()
     vad: VadConfig = VadConfig()
+    wakeword: WakeWordConfig = WakeWordConfig()
     denoise: DenoiseConfig = DenoiseConfig()
     stt: SttConfig = SttConfig()
     llm: LlmConfig = LlmConfig()

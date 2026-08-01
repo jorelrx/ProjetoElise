@@ -22,8 +22,8 @@ Microfone 16kHz (frames de 32ms, thread de áudio dedicada)
   1. Baixe/carregue o modelo **Qwen3.5-9B** (quantização Q4_K_M cabe na RX 580 8GB; use o backend **Vulkan** nas configurações de runtime do LM Studio).
   2. Aba **Developer → Start Server** (padrão `http://localhost:1234/v1`).
   3. Confira o identificador do modelo e ajuste `llm.model` no `config.yaml` se necessário.
-- **Voz Piper pt-BR**: baixe `pt_BR-faber-medium.onnx` **e** `pt_BR-faber-medium.onnx.json` de
-  [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/main/pt/pt_BR/faber/medium)
+- **Voz Piper pt-BR**: baixe `pt_BR-miro-high.onnx` **e** `pt_BR-miro-high.onnx.json` de
+  [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices/tree/main/pt/pt_BR/miro/high)
   para `models/piper/`.
 
 ## Instalação

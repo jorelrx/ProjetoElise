@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import json
 from collections import deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Protocol
 
 import httpx
 import structlog
 
 from ..config import LlmConfig
+from .prompt import PromptBuilder
 
 log = structlog.get_logger(__name__)
 
@@ -43,8 +44,9 @@ class OpenAICompatChat:
     o histórico reflete o que o usuário de fato ouviu.
     """
 
-    def __init__(self, cfg: LlmConfig) -> None:
+    def __init__(self, cfg: LlmConfig, system_prompt_provider: Callable[[], str]) -> None:
         self._cfg = cfg
+        self._system_prompt_provider = system_prompt_provider
         self._client = httpx.AsyncClient(
             base_url=cfg.base_url,
             timeout=httpx.Timeout(cfg.request_timeout_s, connect=10.0),
@@ -85,7 +87,7 @@ class OpenAICompatChat:
         payload = {
             "model": self._cfg.model,
             "messages": [
-                {"role": "system", "content": self._cfg.system_prompt},
+                {"role": "system", "content": self._system_prompt_provider()},
                 *self._history,
             ],
             "temperature": self._cfg.temperature,
@@ -134,5 +136,6 @@ class OpenAICompatChat:
 
 def create_llm(cfg: LlmConfig) -> OpenAICompatChat:
     if cfg.backend == "openai_compat":
-        return OpenAICompatChat(cfg)
+        builder = PromptBuilder(cfg.prompt)
+        return OpenAICompatChat(cfg, system_prompt_provider=builder.build)
     raise ValueError(f"Backend de LLM desconhecido: {cfg.backend}")

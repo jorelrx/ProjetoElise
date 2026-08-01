@@ -15,6 +15,23 @@ vad:
   pre_roll_ms: 320          # Áudio anterior ao gatilho incluído no enunciado (não corta o início).
   max_utterance_s: 30       # Guarda contra enunciados infinitos.
 
+wakeword:
+  # Gatilho "Hey Elise": enquanto desabilitado, a Elise fica sempre ouvindo. Habilitado,
+  # ela só acorda o pipeline pesado (VAD/STT/LLM) após o gatilho — requer o extra
+  # [wakeword] (`pip install -e .[wakeword]`); sem ele, cai de volta a sempre-ativa
+  # automaticamente (log de aviso).
+  enabled: true
+  backend: openwakeword
+  # `model` aponta para o "hey_elise" treinado (veja docs/wakeword_treino.md). Enquanto
+  # esse arquivo não existir, o backend detecta a ausência e usa `fallback_model`
+  # (o pré-treinado "hey_jarvis") automaticamente — não precisa mexer aqui depois de
+  # treinar o seu: só salvar o .onnx no caminho abaixo.
+  model: models/wakeword/hey_elise.onnx
+  fallback_model: hey_jarvis
+  threshold: 0.5
+  inactivity_timeout_s: 45.0   # tempo sem enunciado até voltar a dormir
+  cooldown_s: 2.0              # período refratário após uma detecção
+
 denoise:
   # deepfilternet -> DeepFilterNet3 (melhor qualidade; extra [denoise])
   # noisereduce   -> spectral gating leve (extra [noisereduce])
@@ -42,14 +59,17 @@ llm:
   reasoning_effort: none    # Qwen3.x pensa por padrão e gasta max_tokens inteiro em
                             # "reasoning_content" antes da resposta real (fica vazia).
                             # "none" desliga o thinking. null para deixar o padrão do modelo.
-  system_prompt: |
-    Você é uma assistente.
-    Responda de forma concisa e natural.
+  prompt:
+    # persona: nome embutido ("elise") ou caminho para um arquivo .md com sua própria
+    # persona. Regras de fala para voz (sem markdown, frases curtas) são sempre
+    # aplicadas por cima, independente da persona escolhida.
+    persona: elise
+    include_datetime: true   # injeta data/hora atual no prompt a cada turno
 
 tts:
   backend: piper            # piper (local, recomendado) | edge (nuvem, requer ffmpeg)
   piper:
-    # Baixe em https://huggingface.co/rhasspy/piper-voices (pt/pt_BR/faber/medium)
+    # Baixe em https://huggingface.co/rhasspy/piper-voices (pt/pt_BR/miro/high)
     model_path: models/piper/pt_BR-faber-medium.onnx
   edge:
     voice: pt-BR-FranciscaNeural

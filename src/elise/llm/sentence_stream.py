@@ -47,7 +47,6 @@ def _is_boundary(buffer: str, end_idx: int) -> bool:
                 return False
     return True
 
-
 async def sentences(
     tokens: AsyncIterator[str],
     min_len: int = 24,

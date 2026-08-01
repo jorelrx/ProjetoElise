@@ -30,7 +30,7 @@ BANNER = r"""
 """
 
 
-def _build_services(cfg: EliseConfig, bus: EventBus):
+def _build_services(cfg: EliseConfig, bus: EventBus, wake_enabled: bool = False):
     """Composition root: instancia todos os backends a partir do config."""
     from .audio.denoise import create_denoiser
     from .audio.playback import AudioPlayer
@@ -45,16 +45,18 @@ def _build_services(cfg: EliseConfig, bus: EventBus):
     player = AudioPlayer()
     from .orchestrator import Orchestrator
 
-    orch = Orchestrator(cfg, bus, denoiser, stt, llm, tts, player)
+    orch = Orchestrator(cfg, bus, denoiser, stt, llm, tts, player, wake_enabled=wake_enabled)
     return orch, llm
 
 
 async def run_voice(cfg: EliseConfig) -> None:
     from .audio.capture import MicrophoneCapture
     from .audio.vad import SileroVad, UtteranceSegmenter, ensure_silero_model
+    from .audio.wakeword import WakeWordDetector, create_wakeword_model
 
     bus = EventBus()
-    orch, llm = _build_services(cfg, bus)
+    wake_model = create_wakeword_model(cfg.wakeword)
+    orch, llm = _build_services(cfg, bus, wake_enabled=wake_model is not None)
 
     if not await llm.healthcheck():
         log.error("abortando", motivo="LLM inacessível — inicie o servidor do LM Studio")
@@ -69,12 +71,22 @@ async def run_voice(cfg: EliseConfig) -> None:
     mic = MicrophoneCapture(cfg.audio, bus, loop)
     mic.start()
     print(BANNER)
-    log.info("elise.pronta", modo=cfg.behavior.mode.value, llm=cfg.llm.model)
+    if wake_model is not None:
+        print("    diga 'Hey Elise' para acordar\n")
+    log.info(
+        "elise.pronta",
+        modo=cfg.behavior.mode.value,
+        llm=cfg.llm.model,
+        wake_word=cfg.wakeword.model if wake_model is not None else None,
+    )
 
     tasks = [
         asyncio.create_task(segmenter.run(), name="segmenter"),
         asyncio.create_task(orch.run(), name="orchestrator"),
     ]
+    if wake_model is not None:
+        detector = WakeWordDetector(cfg.wakeword, bus, wake_model, armed=orch.wake_armed)
+        tasks.append(asyncio.create_task(detector.run(), name="wakeword"))
     try:
         await asyncio.gather(*tasks)
     finally:

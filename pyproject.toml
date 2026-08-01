@@ -26,6 +26,8 @@ dependencies = [
 denoise = ["deepfilternet>=0.5.6", "torch>=2.2"]
 # Fallback leve de denoise por spectral gating.
 noisereduce = ["noisereduce>=3.0"]
+# Wake word "Hey Elise" (openWakeWord, backend ONNX).
+wakeword = ["openwakeword>=0.6"]
 # TTS de nuvem gratuito (vozes Neural pt-BR da Microsoft). Requer ffmpeg no PATH.
 edge = ["edge-tts>=6.1"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.10"]
