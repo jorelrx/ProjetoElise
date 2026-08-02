@@ -30,6 +30,15 @@ noisereduce = ["noisereduce>=3.0"]
 wakeword = ["openwakeword>=0.6"]
 # TTS de nuvem gratuito (vozes Neural pt-BR da Microsoft). Requer ffmpeg no PATH.
 edge = ["edge-tts>=6.1"]
+# STT via whisper.cpp (backend "whisper_cpp") — acelera por GPU (Vulkan/CUDA/Metal)
+# em hardware sem suporte a CTranslate2 GPU, ex. AMD Polaris (RX 580) sem ROCm.
+# Para GPU no Linux/AMD, instale com:
+#   CMAKE_ARGS="-DGGML_VULKAN=1" pip install --no-binary pywhispercpp -e .[whispercpp]
+#   bash scripts/fix_pywhispercpp_vulkan.sh
+# (o wheel pré-compilado do PyPI não traz Vulkan habilitado, e esse build
+# "--no-binary" pula o repairwheel/auditwheel que corrige o RUNPATH das libs
+# nativas — sem o script, o import falha com "cannot open shared object file").
+whispercpp = ["pywhispercpp>=1.5"]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4", "mypy>=1.10"]
 
 [project.scripts]

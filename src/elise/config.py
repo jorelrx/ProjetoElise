@@ -61,11 +61,13 @@ class DenoiseConfig(BaseModel):
 
 class SttConfig(BaseModel):
     backend: str = "faster_whisper"
-    model: str = "small"
+    model: str = "small" # small, medium, large-v2, ggml-small.bin, ggml-medium.bin, ggml-large.bin
     language: str = "pt"
     device: str = "cpu"
     compute_type: str = "int8"
     beam_size: int = Field(5, ge=1)
+    # Só usado pelo backend whisper_cpp: caminho do modelo GGML (ex. ggml-small.bin).
+    model_path: Path | None = None
 
 
 class PromptConfig(BaseModel):
@@ -87,7 +89,7 @@ class LlmConfig(BaseModel):
 
 
 class PiperConfig(BaseModel):
-    model_path: Path = Path("models/piper/pt_BR-miro-high.onnx")
+    model_path: Path = Path("models/piper/pt_BR-faber-medium.onnx")
 
 
 class EdgeConfig(BaseModel):
